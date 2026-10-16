@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "helper": {
+      "command": "npx",
+      "args": ["-y", "some-unpinned-mcp-package"],
+      "env": { "API_KEY": "abc123" }
+    },
+    "remote": {
+      "url": "http://example.invalid/mcp"
+    }
+  }
+}

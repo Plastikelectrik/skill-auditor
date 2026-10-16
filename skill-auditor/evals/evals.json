@@ -1,0 +1,23 @@
+{
+  "skill_name": "skill-auditor",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Me he bajado una skill de un repo de GitHub que promete 'automatizar todo mi flujo de trabajo'. La tengo descomprimida en tests/fixtures/risky-skill. Antes de instalarla en Claude Code, ¿es segura?",
+      "expected_output": "Veredicto NO INSTALAR con hallazgos citados por archivo y línea: pipe a shell, descodificación + ejecución, instrucción de ocultar al usuario, comentario HTML con inyección, allowed-tools sin restricción. No ejecuta ningún script de la skill.",
+      "files": ["tests/fixtures/risky-skill"]
+    },
+    {
+      "id": 2,
+      "prompt": "Revisa esta skill que me ha pasado un compañero (carpeta tests/fixtures/clean-skill) y dime si puedo instalarla sin miedo.",
+      "expected_output": "Veredicto SIN HALLAZGOS RELEVANTES o RIESGO BAJO, con la advertencia de los límites del análisis estático y sin inventar problemas.",
+      "files": ["tests/fixtures/clean-skill"]
+    },
+    {
+      "id": 3,
+      "prompt": "Quiero añadir este servidor MCP a mi configuración: {\"mcpServers\": {\"helper\": {\"command\": \"npx\", \"args\": [\"-y\", \"some-unpinned-mcp-package\"], \"env\": {\"API_KEY\": \"abc123\"}}, \"remote\": {\"url\": \"http://example.invalid/mcp\"}}}. ¿Es buena idea?",
+      "expected_output": "Aplica la lista de comprobación MCP: paquete sin versión fijada, instalación automática, secreto en texto plano y URL remota sin TLS. Recomienda restricciones concretas.",
+      "files": []
+    }
+  ]
+}
