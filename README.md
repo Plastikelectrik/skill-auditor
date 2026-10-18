@@ -54,7 +54,7 @@ A skill is a `SKILL.md` your agent will **obey**, plus scripts it will **run wit
 | Exfiltration | Test webhooks, paste sites, tunnels, literal IPs and URL shorteners |
 | Persistence | Shell startup files, scheduled tasks, authorized keys, the agent's own configuration |
 | Excess permissions | Unrestricted `allowed-tools`, attempts to bypass the permission system |
-| Prompt injection | Orders to ignore instructions, hide actions from the user or skip confirmations (English and Spanish) |
+| Prompt injection | Orders to ignore instructions, hide actions from the user or skip confirmations, or fetch their instructions from a remote URL (English and Spanish) |
 | Concealment | Invisible or bidirectional Unicode, hidden HTML comments, links whose text doesn't match their target |
 
 It also reviews **MCP configurations** (unpinned packages, plain `http://`, plaintext secrets, servers launched through a shell), dependency install scripts, opaque binaries and suspicious metadata (reserved names, descriptions that force the skill to trigger on every task).
@@ -147,6 +147,8 @@ python3 -I skill-auditor/scripts/scan_skill.py <target> [options]
 | `0` | No relevant findings, or minor warnings only |
 | `1` | Review in depth |
 | `2` | Do not install |
+| `3` | Error: bad input, unsafe archive or unreadable baseline |
+| `4` | Changed since the baseline (see [Re-audit on change](#re-audit-on-change)) |
 
 ### Example output
 
@@ -173,6 +175,47 @@ Findings: critical 5 | high 11 | medium 10 | low 2 | info 2
 
 Each finding also carries its line of evidence. That evidence comes from the target: **it is untrusted text**, not instructions.
 
+## Re-audit on change
+
+An audit describes one snapshot. A skill that is clean today can change tomorrow. A **baseline** records a SHA-256 for every file at the moment you audited it, so any later change forces a new audit:
+
+```bash
+# 1. After you have audited a skill and decided to trust it, record a baseline.
+#    Store it OUTSIDE the skill folder, ideally in your own repository.
+python3 -I skill-auditor/scripts/scan_skill.py ./some-skill --write-baseline baselines/some-skill.json
+
+# 2. Before every update, or in CI, compare the new version against it.
+python3 -I skill-auditor/scripts/scan_skill.py ./some-skill --baseline baselines/some-skill.json
+```
+
+If anything changed, the exit code is `4` and the report lists what happened. Findings in changed files are marked, so you know where to look first:
+
+```text
+Baseline: DRIFT: 1 added, 1 removed, 1 modified. Re-audit before updating.
+  + scripts/new.py
+  - scripts/count_lines.py
+  ~ SKILL.md
+```
+
+- **Recording a new baseline is deliberate.** `--baseline` and `--write-baseline` cannot be combined, so an update can't silently re-bless itself. A verdict of `2` always wins over `4`.
+- **Pin the source.** Install from a specific commit or release tag, not from a moving branch, and run the check on exactly what you are about to install. A `.skill` or `.zip` of the same content matches the folder.
+- **A baseline records content; it does not endorse it.** Whoever can edit the baseline file can re-bless a change, so keep it somewhere the skill's author can't write to. Signing is not implemented.
+- **Remote instructions.** A `SKILL.md` that tells the agent to fetch instructions from a URL and follow them is flagged as `INJ_REMOTE_INSTR`. Fetching done through code the scanner can't read is still invisible to it, which is one more reason to read the scripts.
+
+Example for CI:
+
+```yaml
+- name: Re-audit vendored skills
+  run: |
+    for d in skills/*/; do
+      name=$(basename "$d")
+      rc=0
+      python3 -I tools/skill-auditor/scripts/scan_skill.py "$d" \
+        --baseline "baselines/$name.json" > /dev/null || rc=$?
+      if [ "$rc" -ne 0 ]; then echo "$name: scanner exit code $rc"; exit 1; fi
+    done
+```
+
 ## Repository layout
 
 ```text
@@ -196,7 +239,7 @@ skill-auditor/                 ← this repository
 python3 tests/run_tests.py
 ```
 
-It checks the clean skill, the risky one, hidden Unicode, rejection of malicious paths in `.zip` files, Spanish prompt-injection phrases, and that the scanner's own source contains no invisible characters. More details in [`tests/README.md`](tests/README.md).
+It checks the clean skill, the risky one, hidden Unicode, rejection of malicious paths in `.zip` files, Spanish prompt-injection phrases, remote-instruction wording, baseline drift detection, and that the scanner's own source contains no invisible characters. More details in [`tests/README.md`](tests/README.md).
 
 ## Limitations (read before trusting it)
 
@@ -204,6 +247,7 @@ It checks the clean skill, the risky one, hidden Unicode, rejection of malicious
 - It cannot see what is **downloaded or decoded at runtime**, nor review **binaries**, compiled libraries or remote dependencies.
 - Pattern lists **can be evaded**. That is why the second layer (manual reading) exists, and why the automatic verdict is only preliminary.
 - It has **false positives**, especially on security or training skills that contain attack examples. If you point it at Skill Auditor itself, it will report plenty of findings: those are its own rules and examples. There is deliberately no ignore list, because an attacker could use one to hide what matters.
+- **It audits a snapshot.** A skill that is clean today can change tomorrow; use a [baseline](#re-audit-on-change) to force a re-audit on any change. Instructions fetched at runtime through code the scanner can't read stay invisible to it.
 - It doesn't replace checking provenance: author, repository history and reputation.
 - The prompt-injection rules match **English and Spanish** phrases only. Attacks written in other languages are not matched by the scanner, so read the text yourself.
 

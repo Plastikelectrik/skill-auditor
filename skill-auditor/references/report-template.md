@@ -12,6 +12,7 @@ Use this structure. Keep the report short when the result is clean and detailed 
 ## What was reviewed
 - Source: <folder / URL / file>, <n> files, <n> scripts
 - Method: automated static scan + manual reading of SKILL.md and scripts
+- Baseline: <none / recorded / unchanged / drift in n files>
 - Not verified: <binaries, remote dependencies, content downloaded at runtime, etc.>
 
 ## Findings

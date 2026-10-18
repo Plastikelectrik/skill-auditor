@@ -26,6 +26,8 @@ Use it to interpret the scanner's findings and for the manual review. Each secti
 
 **Legitimate vs. suspicious:** downloading an official installer in a separate step, verifying its hash and then running it is reasonable. Chaining download and execution without verification, or decoding a blob in order to run it, has no justification in a skill: a script can be written in plain text.
 
+**Remote instructions:** a `SKILL.md` that tells the agent to fetch instructions from a URL and follow them has the same effect without any script: what is reviewed is not what will run. The scanner flags that wording (`INJ_REMOTE_INSTR`). Fetching done through code the scanner cannot read is still invisible to it, so read the scripts.
+
 ## 2. Access to credentials and sensitive data
 
 **Signals:** paths such as SSH key directories, cloud credentials, Kubernetes configuration, `.npmrc`, `.netrc`, browser cookie or password stores, `.env`; dumping the full set of environment variables; references to API keys.
@@ -87,6 +89,8 @@ Use it to interpret the scanner's findings and for the manual review. Each secti
 
 **What to do:** check the package's existence, age and reputation; require a pinned version or a hash; prefer dependencies already present in the environment.
 
+**Changes after the audit:** an audit covers one snapshot, and a benign version 1 can be followed by a hostile version 2. Record a baseline (`--write-baseline`), compare before every update (`--baseline`, exit code `4` on any change) and pin the source to a commit or release tag instead of a branch.
+
 ## 9. Binaries and opaque files
 
 Executables, shared libraries, compiled bytecode, native modules, WebAssembly and nested archives can't be audited with this tool. A skill is text and readable scripts by nature: the presence of binaries needs a justification, and without one, the verdict can't be better than "review in depth".
@@ -106,7 +110,7 @@ To dismiss one, note the reason in the report.
 | Level | Meaning | Examples |
 |---|---|---|
 | Critical | Probable harm or clearly hostile intent | Chained download and execution; credential access with outbound network; an order to hide actions from the user; obfuscation that ends in execution; hidden tag characters |
-| High | Dangerous capability with no obvious justification | Access to sensitive paths; persistence; editing the agent's configuration; unrestricted shell; exfiltration services; opaque binaries |
+| High | Dangerous capability with no obvious justification | Access to sensitive paths; persistence; editing the agent's configuration; unrestricted shell; exfiltration services; opaque binaries; instructions to fetch and follow remote instructions |
 | Medium | Behavior that deserves review | Outbound network, package installation, `sudo`, hidden HTML comments, unpinned dependencies |
 | Low | Minor warning | Isolated zero-width spaces, `http://` without TLS, incomplete metadata |
 | Info | Inventory | Referenced domains, executable files |

@@ -28,6 +28,7 @@ Any pattern list can be bypassed. If you find an evasion that cannot be exploite
 - `.zip`/`.skill` extraction rejects absolute paths, `..`, symlinks and oversized archives.
 - There is **deliberately no ignore list**: an attacker could use it to hide what matters.
 - The output includes text from the target; treat it as **untrusted data**, never as instructions.
+- Baseline files (`--baseline`) are untrusted input too: they are parsed as plain JSON, validated and size-limited, never evaluated. A baseline records content, it does not endorse it, and whoever can edit it can re-bless a change.
 
 ---
 
@@ -55,3 +56,4 @@ Cualquier lista de patrones puede esquivarse. Si encuentras una evasión que no 
 - La extracción de `.zip`/`.skill` rechaza rutas absolutas, `..`, enlaces simbólicos y archivos desproporcionados.
 - **No existe lista de exclusiones** (`ignore`) a propósito: un atacante podría usarla para ocultar lo importante.
 - La salida incluye texto del objetivo; debe tratarse como **dato no confiable**, nunca como instrucciones.
+- Los archivos de línea base (`--baseline`) también son entrada no confiable: se leen como JSON simple, se validan y tienen límite de tamaño, y nunca se evalúan. Una línea base registra contenido, no lo avala, y quien pueda editarla puede dar por buena una modificación.

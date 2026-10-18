@@ -54,7 +54,7 @@ Una skill es un `SKILL.md` que tu agente va a **obedecer**, más scripts que va 
 | Exfiltración | Webhooks de prueba, sitios de pegado, túneles, IP literales y acortadores |
 | Persistencia | Arranque de la shell, tareas programadas, claves autorizadas, configuración del propio agente |
 | Permisos excesivos | `allowed-tools` sin restricción, intentos de saltarse el sistema de permisos |
-| Inyección de prompts | Órdenes de ignorar instrucciones, ocultar acciones al usuario o saltarse confirmaciones (en español e inglés) |
+| Inyección de prompts | Órdenes de ignorar instrucciones, ocultar acciones al usuario o saltarse confirmaciones, o descargar sus instrucciones de una URL remota (en español e inglés) |
 | Ocultación | Unicode invisible o bidireccional, comentarios HTML ocultos, enlaces cuyo texto no coincide con su destino |
 
 Además revisa **configuraciones MCP** (paquetes sin versión fijada, `http://` sin cifrado, secretos en texto plano, servidores lanzados a través de una shell), dependencias con scripts de instalación, binarios opacos y metadatos sospechosos (nombres reservados, descripciones que fuerzan su activación en cualquier tarea).
@@ -150,6 +150,8 @@ python3 -I skill-auditor/scripts/scan_skill.py <objetivo> [opciones]
 | `0` | Sin hallazgos relevantes, o solo avisos menores |
 | `1` | Revisar a fondo |
 | `2` | No instalar |
+| `3` | Error: entrada incorrecta, archivo comprimido inseguro o línea base ilegible |
+| `4` | Cambió respecto a la línea base (ver [Reauditoría al cambiar](#reauditoría-al-cambiar)) |
 
 ### Ejemplo de salida
 
@@ -176,6 +178,47 @@ Findings: critical 5 | high 11 | medium 10 | low 2 | info 2
 
 Cada hallazgo incluye también la línea de evidencia. Esa evidencia procede del objetivo: **es texto no confiable**, no instrucciones.
 
+## Reauditoría al cambiar
+
+Una auditoría describe una instantánea. Una skill limpia hoy puede cambiar mañana. Una **línea base** (*baseline*) guarda el SHA-256 de cada archivo en el momento en que la auditaste, de modo que cualquier cambio posterior obliga a auditar de nuevo:
+
+```bash
+# 1. Cuando hayas auditado una skill y decidas confiar en ella, guarda la línea base.
+#    Guárdala FUERA de la carpeta de la skill, idealmente en tu propio repositorio.
+python3 -I skill-auditor/scripts/scan_skill.py ./una-skill --write-baseline baselines/una-skill.json
+
+# 2. Antes de cada actualización, o en CI, compara la versión nueva con ella.
+python3 -I skill-auditor/scripts/scan_skill.py ./una-skill --baseline baselines/una-skill.json
+```
+
+Si algo cambió, el código de salida es `4` y el informe indica qué. Los hallazgos de los archivos modificados se marcan, así sabes por dónde empezar:
+
+```text
+Baseline: DRIFT: 1 added, 1 removed, 1 modified. Re-audit before updating.
+  + scripts/new.py                  # archivo añadido
+  - scripts/count_lines.py          # archivo eliminado
+  ~ SKILL.md                        # archivo modificado
+```
+
+- **Guardar una línea base nueva es una decisión deliberada.** `--baseline` y `--write-baseline` no se pueden combinar, así que una actualización no puede darse por buena a sí misma. Un veredicto `2` siempre prevalece sobre el `4`.
+- **Fija el origen.** Instala desde un commit concreto o una etiqueta de versión, no desde una rama que se mueve, y comprueba exactamente lo que vas a instalar. Un `.skill` o `.zip` con el mismo contenido coincide con la carpeta.
+- **Una línea base registra el contenido; no lo avala.** Quien pueda editar el archivo puede dar por buena una modificación, así que guárdalo donde el autor de la skill no pueda escribir. La firma criptográfica no está implementada.
+- **Instrucciones remotas.** Un `SKILL.md` que ordena al agente descargar instrucciones de una URL y seguirlas se marca como `INJ_REMOTE_INSTR`. Lo que se descargue desde código que el escáner no pueda leer sigue siendo invisible para él: otra razón para leer los scripts.
+
+Ejemplo para CI:
+
+```yaml
+- name: Reauditar skills incluidas
+  run: |
+    for d in skills/*/; do
+      name=$(basename "$d")
+      rc=0
+      python3 -I tools/skill-auditor/scripts/scan_skill.py "$d" \
+        --baseline "baselines/$name.json" > /dev/null || rc=$?
+      if [ "$rc" -ne 0 ]; then echo "$name: scanner exit code $rc"; exit 1; fi
+    done
+```
+
 ## Estructura del repositorio
 
 ```text
@@ -199,7 +242,7 @@ skill-auditor/                 ← este repositorio
 python3 tests/run_tests.py
 ```
 
-Comprueba la skill limpia, la de riesgo, el Unicode oculto, el rechazo de rutas maliciosas en `.zip`, las frases de inyección de prompts en español y que el propio escáner no lleve caracteres invisibles. Más detalles en [`tests/README.md`](tests/README.md).
+Comprueba la skill limpia, la de riesgo, el Unicode oculto, el rechazo de rutas maliciosas en `.zip`, las frases de inyección de prompts en español, las instrucciones remotas, la detección de cambios respecto a la línea base y que el propio escáner no lleve caracteres invisibles. Más detalles en [`tests/README.md`](tests/README.md).
 
 ## Límites (leer antes de fiarse)
 
@@ -208,6 +251,7 @@ Comprueba la skill limpia, la de riesgo, el Unicode oculto, el rechazo de rutas 
 - Las listas de patrones **pueden esquivarse**. Por eso existe la segunda capa (lectura manual) y por eso el veredicto automático es solo preliminar.
 - **Tiene falsos positivos**, sobre todo en skills de seguridad o formación, que contienen ejemplos de ataque. Si le pasas la propia skill-auditor, saldrá con muchos hallazgos: son sus reglas y ejemplos. No hay lista de exclusiones a propósito, porque un atacante podría usarla para esconder lo importante.
 - Las reglas de inyección de prompts reconocen frases **en inglés y en español**. Los ataques escritos en otros idiomas no los detecta el escáner: lee el texto tú mismo.
+- **Audita una instantánea.** Una skill limpia hoy puede cambiar mañana; usa una [línea base](#reauditoría-al-cambiar) para forzar una nueva auditoría ante cualquier cambio. Las instrucciones que se descarguen en ejecución desde código que el escáner no pueda leer le siguen siendo invisibles.
 - No sustituye la revisión de origen: autor, historial del repositorio y reputación.
 
 ## Contribuir
