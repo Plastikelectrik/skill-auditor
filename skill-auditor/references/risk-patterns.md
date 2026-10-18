@@ -1,110 +1,112 @@
-# Guía de patrones de riesgo
+# Risk pattern guide
 
-Úsala para interpretar los hallazgos del escáner y para la revisión manual. Cada sección explica la señal, por qué importa y cómo distinguir un uso legítimo de uno malicioso.
+Use it to interpret the scanner's findings and for the manual review. Each section explains the signal, why it matters, and how to tell legitimate use from malicious use.
 
-## Índice
+## Index
 
-1. Ejecución remota y ofuscación
-2. Acceso a credenciales y datos sensibles
-3. Exfiltración
-4. Persistencia y manipulación del entorno del agente
-5. Permisos excesivos
-6. Inyección de prompts
-7. Ocultación en el contenido (Unicode, comentarios, enlaces)
-8. Cadena de suministro
-9. Binarios y archivos opacos
-10. Falsos positivos frecuentes
-11. Escala de severidad
+1. Remote execution and obfuscation
+2. Access to credentials and sensitive data
+3. Exfiltration
+4. Persistence and tampering with the agent's environment
+5. Excessive permissions
+6. Prompt injection
+7. Concealment in content (Unicode, comments, links)
+8. Supply chain
+9. Binaries and opaque files
+10. Common false positives
+11. Severity scale
 
 ---
 
-## 1. Ejecución remota y ofuscación
+## 1. Remote execution and obfuscation
 
-**Señales:** descargar algo y pasárselo directamente a una shell o intérprete; `eval`/`exec` sobre contenido calculado; decodificar base64 u otros formatos y ejecutar el resultado; cadenas largas codificadas; `Invoke-Expression` en PowerShell.
+**Signals:** downloading something and piping it straight into a shell or interpreter; `eval`/`exec` on computed content; decoding base64 or other formats and executing the result; long encoded strings; `Invoke-Expression` in PowerShell.
 
-**Por qué importa:** lo que se revisa deja de ser lo que se ejecuta. El código real llega después de la auditoría y puede cambiar en cualquier momento.
+**Why it matters:** what gets reviewed stops being what gets executed. The real code arrives after the audit and can change at any moment.
 
-**Legítimo vs. sospechoso:** descargar un instalador oficial en un paso separado, verificar su hash y ejecutarlo es razonable. Encadenar descarga y ejecución sin verificación, o decodificar un blob para ejecutarlo, no tiene justificación en una skill: un script puede estar escrito en claro.
+**Legitimate vs. suspicious:** downloading an official installer in a separate step, verifying its hash and then running it is reasonable. Chaining download and execution without verification, or decoding a blob in order to run it, has no justification in a skill: a script can be written in plain text.
 
-## 2. Acceso a credenciales y datos sensibles
+## 2. Access to credentials and sensitive data
 
-**Señales:** rutas como los directorios de claves SSH, credenciales de nube, configuración de Kubernetes, `.npmrc`, `.netrc`, almacenes de cookies o de contraseñas del navegador, `.env`; volcado completo de variables de entorno; referencias a claves de API.
+**Signals:** paths such as SSH key directories, cloud credentials, Kubernetes configuration, `.npmrc`, `.netrc`, browser cookie or password stores, `.env`; dumping the full set of environment variables; references to API keys.
 
-**Por qué importa:** las skills se ejecutan con los permisos del usuario. Una sola lectura de estos archivos puede comprometer cuentas y servidores.
+**Why it matters:** skills run with the user's permissions. A single read of these files can compromise accounts and servers.
 
-**Pregunta clave:** ¿el propósito declarado requiere ese dato? Una skill de despliegue puede necesitar una variable concreta; ninguna skill de formato o redacción necesita leer claves privadas. Leer una variable de entorno concreta y documentada es distinto de recorrerlas todas.
+**Key question:** does the declared purpose require that data? A deployment skill may need one specific variable; no formatting or writing skill needs to read private keys. Reading one specific, documented environment variable is different from walking through all of them.
 
-## 3. Exfiltración
+## 3. Exfiltration
 
-**Señales:** envío de datos a dominios que no son del servicio que la skill dice usar; servicios de recepción temporal o de túneles (webhooks de prueba, sitios de pegado, bots de mensajería, servicios de tunelado); URLs con IP literal; acortadores; datos codificados en parámetros de URL o subdominios.
+**Signals:** sending data to domains that don't belong to the service the skill says it uses; temporary receiving or tunneling services (test webhooks, paste sites, messaging bots, tunnel services); URLs with a literal IP; URL shorteners; data encoded in URL parameters or subdomains.
 
-**Combinaciones graves:** acceso a credenciales + red saliente en el mismo archivo o en el mismo flujo. El escáner marca esta combinación como crítica. Confírmala siguiendo el flujo de datos a mano: ¿lo leído llega realmente a lo enviado?
+**Serious combinations:** credential access + outbound network in the same file or the same flow. The scanner flags this combination as critical. Confirm it by following the data flow by hand: does what is read actually reach what is sent?
 
-**Instrucciones, no solo código:** un `SKILL.md` puede pedir al agente que envíe datos a una URL sin que haya ningún script. Revisa el texto con la misma atención.
+**Instructions, not just code:** a `SKILL.md` can ask the agent to send data to a URL without any script being involved. Review the text with the same attention.
 
-## 4. Persistencia y manipulación del entorno del agente
+## 4. Persistence and tampering with the agent's environment
 
-**Señales:** modificar archivos de arranque de la shell, tareas programadas, servicios de usuario, claves SSH autorizadas, registro de Windows; editar la configuración del agente (ajustes, hooks, archivos de memoria o instrucciones, configuración MCP).
+**Signals:** modifying shell startup files, scheduled tasks, user services, authorized SSH keys, the Windows registry; editing the agent's configuration (settings, hooks, memory or instruction files, MCP configuration).
 
-**Por qué importa:** permite que el efecto sobreviva a la desinstalación de la skill o que el agente cambie su propio comportamiento y permisos en futuras sesiones. Un hook o una instrucción persistente plantada es un puesto de mando.
+**Why it matters:** it lets the effect survive uninstalling the skill, or lets the agent change its own behavior and permissions in future sessions. A planted hook or persistent instruction is a command post.
 
-**Legítimo vs. sospechoso:** una skill dedicada a configurar el entorno puede tocar estos archivos si lo declara y pide confirmación. En cualquier otra skill es una alerta alta.
+**Legitimate vs. suspicious:** a skill dedicated to configuring the environment may touch these files if it declares so and asks for confirmation. In any other skill it is a high alert.
 
-## 5. Permisos excesivos
+## 5. Excessive permissions
 
-**Señales:** `allowed-tools` con shell sin restricciones o comodines; descripciones que piden desactivar confirmaciones o usar modos que saltan permisos; peticiones de acceso a todo el sistema de archivos cuando basta una carpeta.
+**Signals:** `allowed-tools` with unrestricted shell or wildcards; descriptions that ask to disable confirmations or to use modes that skip permissions; requests for access to the whole filesystem when one folder is enough.
 
-**Principio:** mínimo privilegio. Una skill que solo transforma texto no necesita shell, red ni escritura fuera de su carpeta. Si el autor puede restringir `Bash(comando:*)` a lo necesario y no lo hace, pregunta por qué.
+**Principle:** least privilege. A skill that only transforms text doesn't need shell, network or writing outside its folder. If the author could restrict `Bash(command:*)` to what is needed and doesn't, ask why.
 
-## 6. Inyección de prompts
+## 6. Prompt injection
 
-**Señales en el texto de la skill:**
-- Órdenes de ignorar, olvidar o anular instrucciones previas o del sistema.
-- Ocultar acciones o resultados al usuario.
-- Actuar sin pedir confirmación, desactivar protecciones o permisos.
-- Revelar el prompt del sistema, el historial o el contexto.
-- Redefinir el rol del agente ("a partir de ahora eres…", "modo sin restricciones").
-- Etiquetas que imitan mensajes de sistema o de asistente.
-- Recopilar claves, tokens o archivos y enviarlos a algún destino.
-- Una descripción que fuerza activarse "siempre", en cualquier tarea.
+**Signals in the skill's text:**
+- Orders to ignore, forget or override earlier or system instructions.
+- Hiding actions or results from the user.
+- Acting without asking for confirmation, disabling protections or permissions.
+- Revealing the system prompt, the history or the context.
+- Redefining the agent's role ("from now on you are…", "unrestricted mode").
+- Tags that imitate system or assistant messages.
+- Collecting keys, tokens or files and sending them somewhere.
+- A description that forces activation "always", on any task.
 
-**Por qué importa:** el agente lee la skill como instrucciones de confianza. Un solo párrafo bien puesto puede cambiar su comportamiento sin que haya código malicioso.
+**Why it matters:** the agent reads the skill as trusted instructions. A single well-placed paragraph can change its behavior with no malicious code at all.
 
-**Matiz:** documentación que *explica* estos ataques (guías de seguridad, esta propia skill) contiene las mismas frases. Mira si el texto las describe o si las ordena.
+**Nuance:** documentation that *explains* these attacks (security guides, this very skill) contains the same phrases. Look at whether the text describes them or orders them.
 
-## 7. Ocultación en el contenido
+**Languages:** the scanner's injection rules match phrases in English and Spanish. Attacks written in other languages will not be matched, so read the text yourself.
 
-- **Caracteres Unicode invisibles:** espacios de ancho cero, caracteres de control bidireccional (el código se ve distinto de como se interpreta) y caracteres "tag" (permiten esconder instrucciones completas invisibles al ojo). Su presencia en una skill casi nunca tiene explicación inocente.
-- **Comentarios HTML en markdown:** no se ven al renderizar pero el agente los lee. Lee su contenido siempre.
-- **Enlaces engañosos:** texto que muestra un dominio y apunta a otro.
-- **Archivos ocultos o muy alejados:** instrucciones enterradas en `references/` o `assets/` que nadie revisa. Se leen igual.
+## 7. Concealment in content
 
-## 8. Cadena de suministro
+- **Invisible Unicode characters:** zero-width spaces, bidirectional control characters (code looks different from how it is interpreted) and "tag" characters (they allow whole instructions to be hidden from the eye). Their presence in a skill almost never has an innocent explanation.
+- **HTML comments in markdown:** they aren't visible when rendered but the agent reads them. Always read their content.
+- **Deceptive links:** text that shows one domain and points to another.
+- **Hidden or far-off files:** instructions buried in `references/` or `assets/` that nobody reviews. They are read all the same.
 
-**Señales:** instalación de paquetes sin versión fijada, ejecución directa de paquetes remotos, `postinstall`/`preinstall` en `package.json`, dependencias con nombres casi idénticos a paquetes conocidos, repositorios recién creados o sin historial, fork de una skill popular con "pequeños cambios".
+## 8. Supply chain
 
-**Qué hacer:** comprobar existencia, antigüedad y reputación del paquete; exigir versión fijada o hash; preferir dependencias que ya estén en el entorno.
+**Signals:** installing packages without a pinned version, directly running remote packages, `postinstall`/`preinstall` in `package.json`, dependencies with names nearly identical to well-known packages, newly created repositories or ones with no history, a fork of a popular skill with "small changes".
 
-## 9. Binarios y archivos opacos
+**What to do:** check the package's existence, age and reputation; require a pinned version or a hash; prefer dependencies already present in the environment.
 
-Ejecutables, bibliotecas compartidas, bytecode compilado, módulos nativos, WebAssembly y archivos comprimidos anidados no se pueden auditar con esta herramienta. Una skill es texto y scripts legibles por naturaleza: la presencia de binarios necesita una justificación, y si no la hay, el veredicto no puede ser mejor que "revisar a fondo".
+## 9. Binaries and opaque files
 
-## 10. Falsos positivos frecuentes
+Executables, shared libraries, compiled bytecode, native modules, WebAssembly and nested archives can't be audited with this tool. A skill is text and readable scripts by nature: the presence of binaries needs a justification, and without one, the verdict can't be better than "review in depth".
 
-- Documentación que *menciona* comandos de instalación o `curl` para explicar el uso.
-- Uso legítimo de `subprocess` con argumentos fijos y sin shell.
-- Cadenas largas que son datos (hashes, fuentes embebidas, imágenes en base64 para HTML).
-- Menciones de `.env` en instrucciones tipo "crea un archivo `.env` con tu clave".
-- Skills de seguridad, pruebas o enseñanza que contienen ejemplos de ataque (comprueba que estén inertes y claramente etiquetados).
+## 10. Common false positives
 
-Para descartar uno, anota el motivo en el informe.
+- Documentation that *mentions* install commands or `curl` to explain usage.
+- Legitimate use of `subprocess` with fixed arguments and no shell.
+- Long strings that are data (hashes, embedded fonts, base64 images for HTML).
+- Mentions of `.env` in instructions like "create a `.env` file with your key".
+- Security, testing or teaching skills that contain attack examples (check that they are inert and clearly labeled).
 
-## 11. Escala de severidad
+To dismiss one, note the reason in the report.
 
-| Nivel | Significado | Ejemplos |
+## 11. Severity scale
+
+| Level | Meaning | Examples |
 |---|---|---|
-| Crítico | Daño probable o intención claramente hostil | Descarga y ejecución encadenadas; acceso a credenciales con red saliente; orden de ocultar acciones al usuario; ofuscación que termina en ejecución; caracteres tag ocultos |
-| Alto | Capacidad peligrosa sin justificación evidente | Acceso a rutas sensibles; persistencia; edición de la configuración del agente; shell sin restricción; servicios de exfiltración; binarios opacos |
-| Medio | Comportamiento que merece revisión | Red saliente, instalación de paquetes, `sudo`, comentarios HTML ocultos, dependencias sin versión |
-| Bajo | Aviso menor | Espacios de ancho cero aislados, `http://` sin TLS, metadatos incompletos |
-| Info | Inventario | Dominios referenciados, archivos ejecutables |
+| Critical | Probable harm or clearly hostile intent | Chained download and execution; credential access with outbound network; an order to hide actions from the user; obfuscation that ends in execution; hidden tag characters |
+| High | Dangerous capability with no obvious justification | Access to sensitive paths; persistence; editing the agent's configuration; unrestricted shell; exfiltration services; opaque binaries |
+| Medium | Behavior that deserves review | Outbound network, package installation, `sudo`, hidden HTML comments, unpinned dependencies |
+| Low | Minor warning | Isolated zero-width spaces, `http://` without TLS, incomplete metadata |
+| Info | Inventory | Referenced domains, executable files |

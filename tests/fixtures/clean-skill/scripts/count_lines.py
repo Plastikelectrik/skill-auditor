@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cuenta las líneas añadidas y eliminadas de un archivo de diff."""
+"""Counts the added and removed lines in a diff file."""
 import sys
 
 
@@ -11,7 +11,7 @@ def main(path: str) -> None:
                 added += 1
             elif line.startswith("-") and not line.startswith("---"):
                 removed += 1
-    print(f"añadidas: {added}, eliminadas: {removed}")
+    print(f"added: {added}, removed: {removed}")
 
 
 if __name__ == "__main__":

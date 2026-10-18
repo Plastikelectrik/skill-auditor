@@ -83,6 +83,16 @@ Una skill maliciosa puede contener texto pensado para manipular al revisor («ig
 
 El escáner propone un veredicto preliminar y su **código de salida** (`0`, `1` o `2`) permite usarlo en scripts o en integración continua. La lectura manual lo confirma o lo corrige **con motivo escrito**.
 
+> La skill, los mensajes del escáner y las etiquetas del informe están en **inglés**. El informe final lo redacta el agente en el idioma en que le escribas.
+
+| Salida del escáner | Significado | Código de salida |
+|---|---|---|
+| `DO NOT INSTALL` | No instalar (cualquier hallazgo crítico) | `2` |
+| `REVIEW IN DEPTH` | Revisar a fondo (altos, o cinco o más medios) | `1` |
+| `LOW RISK (check the warnings)` | Riesgo bajo (revisa los avisos) | `0` |
+| `NO RELEVANT FINDINGS` | Sin hallazgos relevantes | `0` |
+| `CRITICAL` · `HIGH` · `MEDIUM` · `LOW` · `INFO` | Crítico · Alto · Medio · Bajo · Info | — |
+
 ## Instalación
 
 ### Claude Code
@@ -143,24 +153,24 @@ python3 -I skill-auditor/scripts/scan_skill.py <objetivo> [opciones]
 
 ### Ejemplo de salida
 
-Sobre el fixture de riesgo incluido en [`tests/fixtures/`](tests/fixtures) (artificial e inerte):
+Sobre el fixture de riesgo incluido en [`tests/fixtures/`](tests/fixtures) (artificial e inerte). La skill y el escáner están en inglés; el comentario de cada línea es mi traducción:
 
 ```text
-VEREDICTO PRELIMINAR: NO INSTALAR
-Hallazgos: crítico 5 | alto 11 | medio 10 | bajo 2 | info 2
+PRELIMINARY VERDICT: DO NOT INSTALL                  # veredicto preliminar: no instalar
+Findings: critical 5 | high 11 | medium 10 | low 2 | info 2
 
-[CRÍTICO] INJ_SECRECY  SKILL.md:11
-    Instrucción de ocultar acciones o información al usuario
-[CRÍTICO] EXFIL_COMBO  scripts/helper.py
-    El mismo archivo accede a credenciales o variables de entorno y hace red saliente
-[CRÍTICO] OBFUSCATED_EXEC  scripts/helper.py
-    Decodifica contenido ofuscado y lo ejecuta dinámicamente
-[CRÍTICO] PIPE_TO_SHELL  scripts/setup.sh:5
-    Descarga y pasa el contenido directamente a una shell
-[ALTO] TOOLS_UNRESTRICTED  SKILL.md:1
-    Pre-autoriza herramientas sin restricción (shell completo o comodín)
-[ALTO] INJ_HIDDEN_CMD  SKILL.md:13
-    Comentario HTML con instrucciones ocultas
+[CRITICAL] INJ_SECRECY  SKILL.md:11                  # ordena ocultar acciones al usuario
+    Instruction to hide actions or information from the user
+[CRITICAL] EXFIL_COMBO  scripts/helper.py            # credenciales + red saliente, mismo archivo
+    The same file accesses credentials or environment variables and makes outbound network calls: ...
+[CRITICAL] OBFUSCATED_EXEC  scripts/helper.py        # decodifica un blob y lo ejecuta
+    Decodes obfuscated content and executes it dynamically
+[CRITICAL] PIPE_TO_SHELL  scripts/setup.sh:5         # curl ... | sh
+    Downloads content and pipes it straight into a shell
+[HIGH] TOOLS_UNRESTRICTED  SKILL.md:1                # pre-autoriza shell sin restricción
+    Pre-authorizes tools without restriction (full shell or wildcard)
+[HIGH] INJ_IGNORE  SKILL.md:13                       # orden de ignorar instrucciones previas
+    Order to ignore or override previous instructions
 …
 ```
 
@@ -189,7 +199,7 @@ skill-auditor/                 ← este repositorio
 python3 tests/run_tests.py
 ```
 
-Comprueba la skill limpia, la de riesgo, el Unicode oculto, el rechazo de rutas maliciosas en `.zip` y que el propio escáner no lleve caracteres invisibles. Más detalles en [`tests/README.md`](tests/README.md).
+Comprueba la skill limpia, la de riesgo, el Unicode oculto, el rechazo de rutas maliciosas en `.zip`, las frases de inyección de prompts en español y que el propio escáner no lleve caracteres invisibles. Más detalles en [`tests/README.md`](tests/README.md).
 
 ## Límites (leer antes de fiarse)
 
@@ -197,6 +207,7 @@ Comprueba la skill limpia, la de riesgo, el Unicode oculto, el rechazo de rutas 
 - No ve lo que se **descarga o decodifica en tiempo de ejecución**, ni puede revisar **binarios**, bibliotecas compiladas o dependencias remotas.
 - Las listas de patrones **pueden esquivarse**. Por eso existe la segunda capa (lectura manual) y por eso el veredicto automático es solo preliminar.
 - **Tiene falsos positivos**, sobre todo en skills de seguridad o formación, que contienen ejemplos de ataque. Si le pasas la propia skill-auditor, saldrá con muchos hallazgos: son sus reglas y ejemplos. No hay lista de exclusiones a propósito, porque un atacante podría usarla para esconder lo importante.
+- Las reglas de inyección de prompts reconocen frases **en inglés y en español**. Los ataques escritos en otros idiomas no los detecta el escáner: lee el texto tú mismo.
 - No sustituye la revisión de origen: autor, historial del repositorio y reputación.
 
 ## Contribuir

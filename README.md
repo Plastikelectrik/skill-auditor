@@ -29,8 +29,6 @@ A skill is a `SKILL.md` your agent will **obey**, plus scripts it will **run wit
 - **Intent vs. capabilities:** a formatting skill that reads `~/.ssh` is suspicious even if its code is clean.
 - **Zero dependencies:** Python's standard library only.
 
-> **Heads-up on language.** The skill instructions, the scanner's messages and the report labels are currently written in **Spanish**. The README and its images are fully bilingual; see [Report labels](#report-labels-spanish--english) for a translation table. The skill itself has not been translated yet.
-
 ## How it works
 
 <p align="center">
@@ -85,15 +83,12 @@ A malicious skill can contain text designed to manipulate whoever reviews it ("i
 
 The scanner proposes a preliminary verdict and an **exit code** (`0`, `1` or `2`) so you can use it in scripts or continuous integration. Manual reading confirms it or corrects it **with a written reason**.
 
-### Report labels (Spanish → English)
-
 | Scanner output | Meaning | Exit code |
 |---|---|---|
-| `NO INSTALAR` | Do not install | `2` |
-| `REVISAR A FONDO` | Review in depth | `1` |
-| `RIESGO BAJO (revisa los avisos)` | Low risk (check the warnings) | `0` |
-| `SIN HALLAZGOS RELEVANTES` | No relevant findings | `0` |
-| `CRÍTICO` · `ALTO` · `MEDIO` · `BAJO` · `INFO` | Critical · High · Medium · Low · Info | — |
+| `DO NOT INSTALL` | Any critical finding | `2` |
+| `REVIEW IN DEPTH` | High findings, or five or more mediums | `1` |
+| `LOW RISK (check the warnings)` | Only minor warnings | `0` |
+| `NO RELEVANT FINDINGS` | Nothing relevant found | `0` |
 
 ## Installation
 
@@ -155,24 +150,24 @@ python3 -I skill-auditor/scripts/scan_skill.py <target> [options]
 
 ### Example output
 
-Run against the bundled risky fixture in [`tests/fixtures/`](tests/fixtures) (artificial and inert). The scanner's messages are in Spanish; the gloss in the comments is mine.
+Run against the bundled risky fixture in [`tests/fixtures/`](tests/fixtures) (artificial and inert):
 
 ```text
-VEREDICTO PRELIMINAR: NO INSTALAR                    # preliminary verdict: do not install
-Hallazgos: crítico 5 | alto 11 | medio 10 | bajo 2 | info 2
+PRELIMINARY VERDICT: DO NOT INSTALL
+Findings: critical 5 | high 11 | medium 10 | low 2 | info 2
 
-[CRÍTICO] INJ_SECRECY  SKILL.md:11                   # tells the agent to hide actions from the user
-    Instrucción de ocultar acciones o información al usuario
-[CRÍTICO] EXFIL_COMBO  scripts/helper.py             # credentials + outbound network, same file
-    El mismo archivo accede a credenciales o variables de entorno y hace red saliente
-[CRÍTICO] OBFUSCATED_EXEC  scripts/helper.py         # decodes a blob and executes it
-    Decodifica contenido ofuscado y lo ejecuta dinámicamente
-[CRÍTICO] PIPE_TO_SHELL  scripts/setup.sh:5          # curl ... | sh
-    Descarga y pasa el contenido directamente a una shell
-[ALTO] TOOLS_UNRESTRICTED  SKILL.md:1                # pre-authorizes unrestricted shell
-    Pre-autoriza herramientas sin restricción (shell completo o comodín)
-[ALTO] INJ_HIDDEN_CMD  SKILL.md:13                   # instructions hidden in an HTML comment
-    Comentario HTML con instrucciones ocultas
+[CRITICAL] INJ_SECRECY  SKILL.md:11
+    Instruction to hide actions or information from the user
+[CRITICAL] EXFIL_COMBO  scripts/helper.py
+    The same file accesses credentials or environment variables and makes outbound network calls: ...
+[CRITICAL] OBFUSCATED_EXEC  scripts/helper.py
+    Decodes obfuscated content and executes it dynamically
+[CRITICAL] PIPE_TO_SHELL  scripts/setup.sh:5
+    Downloads content and pipes it straight into a shell
+[HIGH] TOOLS_UNRESTRICTED  SKILL.md:1
+    Pre-authorizes tools without restriction (full shell or wildcard)
+[HIGH] INJ_IGNORE  SKILL.md:13
+    Order to ignore or override previous instructions
 …
 ```
 
@@ -201,7 +196,7 @@ skill-auditor/                 ← this repository
 python3 tests/run_tests.py
 ```
 
-It checks the clean skill, the risky one, hidden Unicode, rejection of malicious paths in `.zip` files, and that the scanner's own source contains no invisible characters. More details in [`tests/README.md`](tests/README.md).
+It checks the clean skill, the risky one, hidden Unicode, rejection of malicious paths in `.zip` files, Spanish prompt-injection phrases, and that the scanner's own source contains no invisible characters. More details in [`tests/README.md`](tests/README.md).
 
 ## Limitations (read before trusting it)
 
@@ -210,7 +205,7 @@ It checks the clean skill, the risky one, hidden Unicode, rejection of malicious
 - Pattern lists **can be evaded**. That is why the second layer (manual reading) exists, and why the automatic verdict is only preliminary.
 - It has **false positives**, especially on security or training skills that contain attack examples. If you point it at Skill Auditor itself, it will report plenty of findings: those are its own rules and examples. There is deliberately no ignore list, because an attacker could use one to hide what matters.
 - It doesn't replace checking provenance: author, repository history and reputation.
-- The skill and the scanner's output are currently in Spanish (see the heads-up above).
+- The prompt-injection rules match **English and Spanish** phrases only. Attacks written in other languages are not matched by the scanner, so read the text yourself.
 
 ## Contributing
 

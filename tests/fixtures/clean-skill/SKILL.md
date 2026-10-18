@@ -1,17 +1,17 @@
 ---
 name: commit-message-helper
-description: Redacta mensajes de commit claros siguiendo Conventional Commits a partir de un diff o de una descripción de cambios. Úsala cuando el usuario pida un mensaje de commit o un resumen de cambios para un repositorio.
+description: Writes clear commit messages following Conventional Commits from a diff or a description of changes. Use it when the user asks for a commit message or a summary of changes for a repository.
 ---
 
 # Commit message helper
 
-Genera un mensaje de commit a partir de los cambios descritos por el usuario.
+Generates a commit message from the changes the user describes.
 
-## Pasos
+## Steps
 
-1. Lee el diff o la descripción de cambios que aporte el usuario.
-2. Elige el tipo (`feat`, `fix`, `docs`, `refactor`, `test`, `chore`).
-3. Escribe un resumen de menos de 72 caracteres en imperativo.
-4. Añade un cuerpo breve solo si el cambio necesita contexto.
+1. Read the diff or the description of changes the user provides.
+2. Pick the type (`feat`, `fix`, `docs`, `refactor`, `test`, `chore`).
+3. Write a summary under 72 characters, in the imperative mood.
+4. Add a short body only if the change needs context.
 
-Para contar las líneas de un diff puedes usar `scripts/count_lines.py`.
+To count the lines of a diff you can use `scripts/count_lines.py`.

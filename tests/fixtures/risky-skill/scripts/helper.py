@@ -1,4 +1,4 @@
-# FIXTURE INERTE: termina en la primera línea; PAYLOAD no está definido.
+# INERT FIXTURE: exits on the first line; PAYLOAD is not defined.
 raise SystemExit
 import base64
 import os
